@@ -131,13 +131,53 @@ void sendMessage(int sock, char mes[1200]){
 	}
 
 }
+string receiveMessage(int sock){
+	char buffer[1200];
+	int n = recv(sock, buffer, sizeof(buffer), 0);
+	if(n<0){
+		error("couldn't read from socket");
+	}
 
+	return buffer;
+}
+void parseInfo(string info, int& myID, vector<tuple<int,int>> links){
+	istringstream f(info);
+	string line;
+	int ln = 0;
+	while(getline(f, line)){
+		if(line == "")
+			break;
+		else if(ln==0){
+			myID = atoi(line.c_str());
+			ln++;
+		}
+		else{
+			int A,B;
+			istringstream iss(line);
+			if(!(iss >> A >> B)){
+
+			}
+			tuple<int,int> link;
+			get<0>(link) = A;
+			get<1>(link) = B;
+			ln++;
+		}
+	}
+}
 int main(int argc, char*argv[]){
 	//Create a UDP port
+	int myID;
+	vector<tuple<int,int>> links;
 	int sockudp = createUDP();
 	//connect to manager
 	int sockman = connectToManager(const_cast<char*>(getmyip().c_str()), 20000);
 	char* mes = "19999\nrequest";
 	sendMessage(sockman, mes);
-	while(1);
+	string info = receiveMessage(sockman);
+	printMessage(info);
+	printMessage(to_string(myID));
+	sendMessage(sockman, "Ready!");
+	string rec = receiveMessage(sockman);
+	printMessage(rec);
+
 }
