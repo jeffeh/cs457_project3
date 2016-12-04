@@ -179,8 +179,6 @@ string convertTupToMes(vector<tuple<int, int, int>> in){
 
 	for(tuple<int,int,int> t:in){
 		ret += to_string(get<1>(t));
-		cout <<"0: "<<to_string(get<1>(t))<<endl;
-		cout <<"1: "<<get<2>(t)<<endl;
 		ret += " "+to_string(get<2>(t));
 		ret +="\n";
 	}
@@ -211,7 +209,7 @@ int main(int argc, char* argv[]){
 		string s = convertTupToMes(tos);
 		printMessage(s);
 		char* c = const_cast<char*>(s.c_str());
-		cout << c << endl;
+
 		sendMessage(clientSock, c);
 	}
 	string rr = receiveMessage(clientSock);
