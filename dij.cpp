@@ -3,6 +3,7 @@
 #include<bits/stdc++.h>
 #include<tuple>
 #include<fstream>
+#include<sys/stat.h>
 
 using namespace std;
 # define INF 0x3f3f3f3f
@@ -30,8 +31,8 @@ public:
 	void shortestPath(int s);
 	
 	//Print to Console and file
-	void printToConsole(std::ofstream &out);
-	void printToFile(string File);
+	void printToConsole();
+	void printToFile(std::ofstream &out);
 	
 };
 
@@ -121,25 +122,46 @@ void Graph::shortestPath(int src)
 
 }
 
-void Graph::printToConsole(std::ofstream &out){
+void Graph::printToConsole(){
 	int node, nextHop, cost;
 	for (int i = 0; i <V; ++i){
 		node =  std::get<0>(routingTable[i]);
 		nextHop =  std::get<1>(routingTable[i]);
 		cost =  std::get<2>(routingTable[i]);
 		printf("For node: %d \t\t NextHop is: %d \t\t Cost: %d\n", node, nextHop, cost);
-		out << "For node: " << node << "\t\t Next hop is: " << nextHop << "\t\t Cost: " << cost << endl;	
 	}
 }
 
-void Graph::printToFile(string File){
-	cout << "NOT IMPLEMENTED YET!" << endl;
+bool fileExists(const std::string& filename)
+{
+    struct stat buf;
+    if (stat(filename.c_str(), &buf) != -1)
+    {
+        return true;
+    }
+    return false;
+}
+
+void clearFile(){
+	if(fileExists("dij.out")){
+		remove("dij.out");
+	}
+}
+
+void Graph::printToFile(std::ofstream &out){
+	int node, nextHop, cost;
+	for (int i = 0; i <V; ++i){
+		node =  std::get<0>(routingTable[i]);
+		nextHop =  std::get<1>(routingTable[i]);
+		cost =  std::get<2>(routingTable[i]);
+		out << "For node: " << node << "\t\t Next hop is: " << nextHop << "\t\t Cost: " << cost << endl;	
+	}
 }
 
 // Driver program to test methods of graph class
 int main()
 {
-
+	clearFile();
 	ofstream out;
 	out.open("dij.out");
 
@@ -166,6 +188,7 @@ int main()
 
 	g.shortestPath(5);
 	
-	g.printToConsole(out);
+	g.printToConsole();
+	g.printToFile(out);
 	return 0;
 }
