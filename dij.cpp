@@ -1,6 +1,8 @@
 // Program to find Dijkstra's shortest path using
 // priority_queue in STL
 #include<bits/stdc++.h>
+#include<tuple>
+
 using namespace std;
 # define INF 0x3f3f3f3f
 
@@ -19,12 +21,17 @@ class Graph
 
 public:
 	Graph(int V); // Constructor
-
+	vector<tuple<int, int, int>> routingTable; // Tuple format: Node, Next Hop Cost 
 	// function to add an edge to graph
 	void addEdge(int u, int v, int w);
 
 	// prints shortest path from s
 	void shortestPath(int s);
+	
+	//Print to Console and file
+	void printToConsole();
+	void printToFile(string File);
+	
 };
 
 // Allocates memory for adjacency list
@@ -57,14 +64,6 @@ void Graph::shortestPath(int src)
     vector<int> currentPathTo;
     vector<vector<int> > pathsToVec (V, currentPathTo);
     pathsToVec[src].push_back(src);
-    printf("The next hops are:\n");
-    for (int j = 0; j < V; ++j)
-        if (pathsToVec[j].size() < 1)
-            printf("For node: %d \t\t NextHop is: %d\n", j, 999999999);
-        else if (pathsToVec[j].size() < 2)
-            printf("For node: %d \t\t NextHop is: %d\n", j, pathsToVec[j][0]);
-        else
-            printf("For node: %d \t\t NextHop is: %d\n", j, pathsToVec[j][1]);
 
 	// Insert source itself in priority queue and initialize
 	// its distance as 0.
@@ -106,20 +105,33 @@ void Graph::shortestPath(int src)
 			}
 		}
 	}
+	int node, nextHop, cost;
+	for (int i = 0; i < V; ++i){
+		node = i;
+		if (pathsToVec[i].size() < 1)
+            		nextHop = NULL;
+        	else if (pathsToVec[i].size() < 2)
+        		nextHop = pathsToVec[i][0];
+        	else
+			nextHop = pathsToVec[i][1];
+		cost = dist[i];
+		routingTable.push_back(tuple<int, int, int> (i, nextHop, cost));
+	}
 
-	// Print shortest distances stored in dist[]
-	printf("Vertex Distance from Source\n");
-	for (int i = 0; i < V; ++i)
-		printf("%d \t\t %d\n", i, dist[i]);
-    
-    printf("The next hops are:\n");
-    for (int j = 0; j < V; ++j)
-        if (pathsToVec[j].size() < 1)
-            printf("For node: %d \t\t NextHop is: %d\n", j, 999999999);
-        else if (pathsToVec[j].size() < 2)
-            printf("For node: %d \t\t NextHop is: %d\n", j, pathsToVec[j][0]);
-        else
-            printf("For node: %d \t\t NextHop is: %d\n", j, pathsToVec[j][1]);
+}
+
+void Graph::printToConsole(){
+	int node, nextHop, cost;
+	for (int i = 0; i <V; ++i){
+		node =  std::get<0>(routingTable[i]);
+		nextHop =  std::get<1>(routingTable[i]);
+		cost =  std::get<2>(routingTable[i]);
+		printf("For node: %d \t\t NextHop is: %d \t\t Cost: %d\n", node, nextHop, cost);
+	}
+}
+
+void Graph::printToFile(string File){
+	cout << "NOT IMPLEMENTED YET!" << endl;
 }
 
 // Driver program to test methods of graph class
@@ -146,6 +158,7 @@ int main()
 	g.addEdge(8, 9, 70);
 
 	g.shortestPath(5);
-
+	
+	g.printToConsole();
 	return 0;
 }
