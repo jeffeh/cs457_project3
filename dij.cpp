@@ -2,6 +2,7 @@
 // priority_queue in STL
 #include<bits/stdc++.h>
 #include<tuple>
+#include<fstream>
 
 using namespace std;
 # define INF 0x3f3f3f3f
@@ -29,7 +30,7 @@ public:
 	void shortestPath(int s);
 	
 	//Print to Console and file
-	void printToConsole();
+	void printToConsole(std::ofstream &out);
 	void printToFile(string File);
 	
 };
@@ -120,13 +121,14 @@ void Graph::shortestPath(int src)
 
 }
 
-void Graph::printToConsole(){
+void Graph::printToConsole(std::ofstream &out){
 	int node, nextHop, cost;
 	for (int i = 0; i <V; ++i){
 		node =  std::get<0>(routingTable[i]);
 		nextHop =  std::get<1>(routingTable[i]);
 		cost =  std::get<2>(routingTable[i]);
 		printf("For node: %d \t\t NextHop is: %d \t\t Cost: %d\n", node, nextHop, cost);
+		out << "For node: " << node << "\t\t Next hop is: " << nextHop << "\t\t Cost: " << cost << endl;	
 	}
 }
 
@@ -137,6 +139,11 @@ void Graph::printToFile(string File){
 // Driver program to test methods of graph class
 int main()
 {
+
+	ofstream out;
+	out.open("dij.out");
+
+
 	// create the graph given in above fugure
 	int V = 10;
 	Graph g(V);
@@ -159,6 +166,6 @@ int main()
 
 	g.shortestPath(5);
 	
-	g.printToConsole();
+	g.printToConsole(out);
 	return 0;
 }
