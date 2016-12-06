@@ -34,3 +34,10 @@ public:
 	sockaddr_in sin_other;
 	int fileDesc;
 };
+
+class FT {
+public:
+	vector<tuple<int,int,int>> table;
+	int getRouteTo(int i);
+	int getCostTo(int i);
+};

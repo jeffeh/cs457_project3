@@ -27,6 +27,8 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <ConnectivityTable.h>
+#include "dij.h"
+#include <unistd.h>
 using namespace std;
 typedef struct packet{
 	char mes[1200];
@@ -112,6 +114,22 @@ int connectToManager(char* hostname, int port){
 	//sockett = socketFileDesc;
 	return socketFileDesc;
 }
+int FT::getRouteTo(int i){
+	for(tuple<int,int,int> edge:this->table){
+		if(get<0>(edge)==i){
+			return get<1>(edge);
+		}
+	}
+	return -1;
+}
+int FT::getCostTo(int i){
+	for(tuple<int,int,int> edge:this->table){
+		if(get<0>(edge)==i){
+			return get<2>(edge);
+		}
+	}
+	return -1;
+}
 tuple<int,int> createUDP(){
 	int port;
 	struct sockaddr_in serverAddress, client;
@@ -163,10 +181,10 @@ void ackin(int sockFD){
 
 	recvfrom(sockFD, buf, sizeof(buf), 0, (sockaddr*)&t, (unsigned int*)&l);
 
-	cout << buf << endl;
+	//cout << buf << endl;
 	string b = buf;
 	if(b.compare("ack")==0){
-		cout << "got Ack" << endl;
+		//cout << "got Ack" << endl;
 	}
 }
 void parseInfo(string info, int& myID, vector<tuple<int,int,int>>& links);
@@ -202,29 +220,64 @@ void startUDPListening(int socketFileDesc, vector<tuple<int,int,int>> links){
 
 
 }
+
+
+
+//void sendOwnLSP(vector<Neighbor> nett){
+//	for(Neighbor n:nett){
+//
+//	}
+//}
+//void getNeighborsLSPs(int sock, vector<Neighbor> nett){
+//	for(Neighbor n:nett){
+//		sockaddr t;
+//		size_t l = sizeof(t);
+//		char buf[512];
+//
+//		recvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr*)&nett[i].sin_other)
+//	}
+//}
+
+
+
+
+
+void dij(vector<tuple<int, vector<tuple<int,int,int>>>> LSPs, int myID);
+
+
 void sendLSPToNeighbors(int socketFileDesc,string lsp, vector<tuple<int,int,int>> links, vector<Neighbor> net){
 	int i=0;
-	for(tuple<int,int,int> link:links){
-		cout << "sending lsp to neighbr" << lsp[0] << endl;
+	for(Neighbor n:net){
+		cout << "SENDING LSP" << endl;
+		//cout << "sending lsp to neighbr" << lsp[0] << endl;
 		char* l = const_cast<char*>(lsp.c_str());
 		char buf[512];
 		strcpy(buf, l);
-		sendto(net[i].fileDesc, buf, strlen(buf),0,(struct sockaddr*)&net[i].sin_other, sizeof(net[i].sin_other));
+		//cout << endl;
+		//cout << endl;
+		//cout << "SENDING" << endl;
 
+			//cout << buf << endl;
+		sendto(n.fileDesc, buf, sizeof(buf),0,(struct sockaddr*)&n.sin_other, sizeof(n.sin_other));
+		i++;
 	}
 }
-void startUDPrecLSP(int myID, int socketFileDesc, vector<tuple<int,int,int>> linkss, vector<Neighbor> net){
-	vector<tuple<int, vector<tuple<int,int,int>>>> LSPs;
-	while(true){
+vector<tuple<int, vector<tuple<int,int,int>>>> LSPs;
+void startUDPrecLSP(int myID, int socketFileDesc, vector<tuple<int,int,int>> linkss, vector<Neighbor> net, int sizeOfNetwork){
+
+	while(LSPs.size()<sizeOfNetwork-1){
 		sockaddr t;
 		size_t l = sizeof(t);
 		char buf[512];
 
 		recvfrom(socketFileDesc, buf, sizeof(buf), 0, (sockaddr*)&t, (unsigned int*)&l);
 		string inf = buf;
-		int N; vector<tuple<int,int,int>> links;
+
+		int N; vector<tuple<int,int,int>> links = {};
 		parseInfo(inf,N,links);
 		int tobreak = 0;
+		if(N==myID)
+			tobreak = 1;
 		for(int i=0; i<LSPs.size(); i++){
 			if(get<0>(LSPs[i])==N){
 				tobreak = 1; break;
@@ -234,28 +287,125 @@ void startUDPrecLSP(int myID, int socketFileDesc, vector<tuple<int,int,int>> lin
 			}
 		}
 		if(tobreak){
-			break;
+			continue;
 		}
 		else{
-			cout << "Router "<< myID <<" got lsp from " << N << endl;
+			//cout << "Router "<< myID <<" got lsp from " << N << endl;
 			tuple<int, vector<tuple<int,int,int>>> ls;
 			get<0>(ls) = N;
 			get<1>(ls) = links;
 			LSPs.push_back(ls);
 			sendLSPToNeighbors(socketFileDesc, getLSP(N, links), linkss, net);
 		}
+
+	}
+	string out = "Router " + to_string(myID) + " has received LSPs for: [";
+	for(int i=0; i<LSPs.size(); i++){
+		out += to_string(get<0>(LSPs[i]));
+		if(i<LSPs.size()-1){
+			out += ", ";
+		}
+
+	}
+	out += "]";
+	//cout << out << endl;
+
+}
+void sendRouterMessage(vector<tuple<int,int,int>> links, vector<Neighbor> nett, int dest);
+void awaitRouterMessages(vector<tuple<int,int,int>> links, vector<Neighbor> nett, int sockudp, int myID){
+
+	while(true){
+	sockaddr t;
+	size_t l = sizeof(t);
+	char buf[512];
+
+	recvfrom(sockudp, buf, sizeof(buf), 0, (sockaddr*)&t, (unsigned int*)&l);
+	string inf = buf;
+	if(myID == atoi(inf.c_str())){
+		cout << myID << " got the packet" << endl;
+		return;
+	}
+
+	cout << myID <<" received a packet to forward to " << inf << "s"<< endl;
+	int dest = atoi(inf.c_str());
+
+
+	//sendRouterMessage(links, nett, dest);
 	}
 }
+void awaitInstructions(int myID, int sockudp, int sockman, vector<tuple<int,int,int>> links, vector<Neighbor> nett){
+	int sent = 1;
+	while(sent){
+		cout << "receveing" << endl;
+		string inst = receiveMessage(sockman);
+		if(inst.compare("Quit")==0){
+			//cout << myID << " Got QUIT" << endl;
+			sent = 0;
+			cout << myID << " exiting!" << endl;
+			close(sockudp);
+			close(sockman);
+			exit(0);
+			break;
+		}
+		else{
+			int dest = atoi(inst.c_str());
+			cout << myID << " has been instructed to send a packet to " << dest << endl;
+			sendRouterMessage(links, nett, dest);
+			//send message over udp to dest
+		}
+	}
+
+}
+FT ft;
+void sendRouterMessage(vector<tuple<int,int,int>> links, vector<Neighbor> nett, int dest){
+	cout << "SEND ROUTER MESSAGE CALLED" << endl;
+	int i = 0;
+	int p = ft.getRouteTo(dest);
+	for(tuple<int,int,int> t:links){
+		if(p==get<0>(t)){
+			break;
+		}
+		i++;
+	}
+	string k = to_string(dest);
+	char* l = const_cast<char*>(k.c_str());
+
+
+	char buf[512];
+	strcpy(buf, l);
+
+	sendto(nett[i].fileDesc, buf, sizeof(buf),0,(struct sockaddr*)&nett[i].sin_other, sizeof(nett[i].sin_other));
+
+}
+
 
 string getLSP(int N, vector<tuple<int,int,int>> links){
+	cout << "GETLSPCALLED:" << endl;
 	string ret;
 	ret += to_string(N);
 	ret += "\n";
 	for(tuple<int,int,int>link:links){
-		ret += to_string(get<0>(link)) +" "+to_string(get<1>(link))+" "+to_string(get<2>(link));
+		ret += to_string(get<0>(link)) +" "+to_string(get<1>(link))+" "+to_string(get<2>(link))+"\n";
 	}
+	//cout <<"GETLSP \n" << ret << endl;
 	return ret;
 }
+
+void dij(vector<tuple<int, vector<tuple<int,int,int>>>> LSPs, int myID){
+	Graph g(LSPs.size()+1, myID);
+	for(tuple<int, vector<tuple<int,int,int>>> LSP:LSPs){
+		for(tuple<int,int,int> edge:get<1>(LSP)){
+			g.addEdge(get<0>(LSP), get<0>(edge), get<1>(edge));
+		}
+	}
+	g.shortestPath();
+	string filename = to_string(myID)+".out";
+	char* file = const_cast<char*>(filename.c_str());
+	ofstream out;out.open(file);
+	g.printToFile(out);
+	ft.table = g.routingTable;
+}
+
 
 void parseInfo(string info, int& myID, vector<tuple<int,int,int>>& links){
 	istringstream f(info);
@@ -283,6 +433,15 @@ void parseInfo(string info, int& myID, vector<tuple<int,int,int>>& links){
 		}
 	}
 }
+
+void printLSPs(vector<tuple<int, vector<tuple<int,int,int>>>> LSPs){
+	for(int i=0; i<LSPs.size(); i++){
+		for(tuple<int,int,int> edge:get<1>(LSPs[i])){
+			cout << get<0>(LSPs[i]) << " "<<get<0>(edge) << " "<<get<1>(edge)<<endl;;
+		}
+	}
+}
+
 int main(int argc, char*argv[]){
 	cout << "Router process created!" << endl;
 
@@ -345,10 +504,20 @@ int main(int argc, char*argv[]){
 	t1.join();
 	sendMessage(sockman, "all acks recieved");
 	string l = receiveMessage(sockman);
+	int sizeOfNetwork = atoi(receiveMessage(sockman).c_str());
 	//cout <<"Router "<<myID << ": " << l << endl;
-	thread t2(startUDPrecLSP,myID, sockudp, links, nett);
+	vector<tuple<int, vector<tuple<int,int,int>>>> d;
+	thread t2(startUDPrecLSP,myID, sockudp, links, nett, sizeOfNetwork);
 	sendLSPToNeighbors(sockudp, getLSP(myID, links), links, nett);
+
 	t2.join();
+	//cout << "Table for: " << myID << endl;
+	dij(LSPs, myID);
+	thread t3(awaitRouterMessages, links, nett, sockudp, myID);
+	awaitInstructions(myID, sockudp, sockman, links, nett);
+	t3.join();
+//	if(myID==5)
+//		printLSPs(LSPs);
 
 
 }

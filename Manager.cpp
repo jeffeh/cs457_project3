@@ -29,6 +29,7 @@ void error(const string msg)
  perror((msg.c_str()));
  exit(1);
 }
+vector<tuple<int, int>> pacToSend;
 vector<tuple<int,int,int>> readFile(string fileName, int& N){
 
 	vector<tuple<int,int,int>> ret;
@@ -58,6 +59,22 @@ vector<tuple<int,int,int>> readFile(string fileName, int& N){
 			ret.push_back(h);
 		}
 
+	}
+	//read src-dest packets
+	while (getline(infile, line)) {
+		if (line.compare("-1")==0) {
+			break;
+		} else {
+			istringstream iss(line);
+			int src, dst;
+			tuple<int,int> p;
+			if (!(iss >> src >> dst)){ cout << "line " << ln << " wrong" << endl;break;}
+			ln++;
+			get<0>(p)=src;
+			get<1>(p)=dst;
+			pacToSend.push_back(p);
+			cout << "--------src is: " << src << " -------------dst is: " << dst << endl;
+		}
 	}
 	return ret;
 }
@@ -325,6 +342,21 @@ void startServer(int N, vector<Router> net){
 	}
 	for(int i=0; i<net.size(); i++){
 		sendMessage(net[i].sockFD, "begin LSP");
+		sendMessage(net[i].sockFD, const_cast<char*>(to_string(net.size()).c_str()));
+	}
+	for(tuple<int,int> packet:pacToSend){
+		
+		int i = get<0>(packet);
+		
+		char* toSend = const_cast<char*>(to_string(get<1>(packet)).c_str());
+		cout << "telling " << i << " to send a packet to" << toSend << endl;
+		sendMessage(net[i].sockFD, toSend);
+		sleep(3);
+	}
+	cout << "HERE" << endl;
+	for(int i=0; i<net.size(); i++){
+		sendMessage(net[i].sockFD, "Quit");
+		cout << "telling " << i << " to quit." << endl;
 	}
 }
 
