@@ -319,6 +319,13 @@ void startServer(int N, vector<Router> net){
 	}
 	
 	cout << "ALL NETWORKS SET UP" << endl;
+	for(int i=0; i<net.size(); i++){
+		string r = receiveMessage(net[i].sockFD);
+		cout << r << " for "<<net[i].myID<<endl;
+	}
+	for(int i=0; i<net.size(); i++){
+		sendMessage(net[i].sockFD, "begin LSP");
+	}
 }
 
 int main(int argc, char* argv[]){
@@ -357,6 +364,8 @@ int main(int argc, char* argv[]){
 		 waitpid(pids[i], &status, 0);
 	}
 	t1.join();
+	
+	
 	free(pids);
 
 

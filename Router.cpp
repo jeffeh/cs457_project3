@@ -26,6 +26,7 @@
 #include <thread>
 #include <cstring>
 #include <arpa/inet.h>
+#include <ConnectivityTable.h>
 using namespace std;
 typedef struct packet{
 	char mes[1200];
@@ -83,6 +84,7 @@ void error(const string msg)
  perror((msg.c_str()));
  exit(1);
 }
+string getLSP(int N, vector<tuple<int,int,int>> links);
 int connectToManager(char* hostname, int port){
 	int socketFileDesc;
 	struct sockaddr_in serverAddress;
@@ -167,6 +169,7 @@ void ackin(int sockFD){
 		cout << "got Ack" << endl;
 	}
 }
+void parseInfo(string info, int& myID, vector<tuple<int,int,int>>& links);
 void ackout(int sockFD){
 	char buf[512];
 	strcpy(buf, "ack");
@@ -197,8 +200,61 @@ void startUDPListening(int socketFileDesc, vector<tuple<int,int,int>> links){
 	}
 	join_all(ts);
 
+
+}
+void sendLSPToNeighbors(int socketFileDesc,string lsp, vector<tuple<int,int,int>> links, vector<Neighbor> net){
+	int i=0;
+	for(tuple<int,int,int> link:links){
+		char* l = const_cast<char*>(lsp.c_str());
+		char buf[512];
+		strcpy(buf, l);
+		sendto(net[i].fileDesc, buf, strlen(buf),0,(struct sockaddr*)&net[i].sin_other, sizeof(net[i].sin_other));
+
+	}
+}
+void startUDPrecLSP(int myID, int socketFileDesc, vector<tuple<int,int,int>> linkss, vector<Neighbor> net){
+	vector<tuple<int, vector<tuple<int,int,int>>>> LSPs;
+	while(true){
+		sockaddr t;
+		size_t l = sizeof(t);
+		char buf[512];
+
+		recvfrom(socketFileDesc, buf, sizeof(buf), 0, (sockaddr*)&t, (unsigned int*)&l);
+		string inf = buf;
+		int N; vector<tuple<int,int,int>> links;
+		parseInfo(inf,N,links);
+		int tobreak = 0;
+		for(int i=0; i<LSPs.size(); i++){
+			if(get<0>(LSPs[i])==N){
+				tobreak = 1; break;
+			}
+			else{
+
+			}
+		}
+		if(tobreak){
+			break;
+		}
+		else{
+			cout << "Router "<< myID <<" got lsp from " << N << endl;
+			tuple<int, vector<tuple<int,int,int>>> ls;
+			get<0>(ls) = N;
+			get<1>(ls) = links;
+			LSPs.push_back(ls);
+			sendLSPToNeighbors(socketFileDesc, getLSP(N, links), linkss, net);
+		}
+	}
 }
 
+string getLSP(int N, vector<tuple<int,int,int>> links){
+	string ret;
+	ret += to_string(N);
+	ret += "\n";
+	for(tuple<int,int,int>link:links){
+		ret += to_string(get<0>(link)) +" "+to_string(get<1>(link))+" "+to_string(get<2>(link));
+	}
+	return ret;
+}
 
 void parseInfo(string info, int& myID, vector<tuple<int,int,int>>& links){
 	istringstream f(info);
@@ -252,6 +308,9 @@ int main(int argc, char*argv[]){
 	cout << ready << endl;
 
 	thread t1(startUDPListening, sockudp, links);
+	vector<Neighbor> nett;
+
+	int i=0;
 	for(tuple<int,int,int> link:links){
 //		int sockD = connectToUdp(link);
 		struct sockaddr_in si_other;
@@ -269,14 +328,26 @@ int main(int argc, char*argv[]){
 			 fprintf(stderr, "inet_aton() failed\n");
 		     exit(1);
 		 }
+
+		 i++;
 		 sendto(s,"ack",strlen("ack"),0,(struct sockaddr*)&si_other, sizeof(si_other));
 		//ackout(s);
+		 Neighbor nn;
+
+		 nn.fileDesc = s;
+		 nn.sin_other = si_other;
+		 nett.push_back(nn);
 	}
 
 
 
 	t1.join();
-
+	sendMessage(sockman, "all acks recieved");
+	string l = receiveMessage(sockman);
+	cout <<"Router "<<myID << ": " << l << endl;
+	thread t2(startUDPrecLSP,myID, sockudp, links, nett);
+	sendLSPToNeighbors(sockudp, getLSP(myID, links), links, nett);
+	t2.join();
 
 
 }
