@@ -16,19 +16,20 @@ typedef pair<int, int> iPair;
 class Graph
 {
 	int V; // No. of vertices
+	int node; //the source node
 
 	// In a weighted graph, we need to store vertex
 	// and weight pair for every edge
 	list< pair<int, int> > *adj;
 
 public:
-	Graph(int V); // Constructor
+	Graph(int V, int node); // Constructor
 	vector<tuple<int, int, int>> routingTable; // Tuple format: Node, Next Hop Cost 
 	// function to add an edge to graph
 	void addEdge(int u, int v, int w);
 
 	// prints shortest path from s
-	void shortestPath(int s);
+	void shortestPath();
 	
 	//Print to Console and file
 	void printToConsole();
@@ -37,9 +38,10 @@ public:
 };
 
 // Allocates memory for adjacency list
-Graph::Graph(int V)
+Graph::Graph(int V, int node)
 {
 	this->V = V;
+	this->node = node;
 	adj = new list<iPair> [V];
 }
 
@@ -50,8 +52,9 @@ void Graph::addEdge(int u, int v, int w)
 }
 
 // Prints shortest paths from src to all other vertices
-void Graph::shortestPath(int src)
+void Graph::shortestPath()
 {
+	int src = this->node;
 	// Create a priority queue to store vertices that
 	// are being preprocessed. This is weird syntax in C++.
 	// Refer below link for details of this syntax
@@ -168,7 +171,7 @@ int main()
 
 	// create the graph given in above fugure
 	int V = 10;
-	Graph g(V);
+	Graph g(V, 1);
 
 	// making above shown graph
 	g.addEdge(0, 9, 40);
@@ -186,7 +189,7 @@ int main()
 	g.addEdge(7, 9, 60);
 	g.addEdge(8, 9, 70);
 
-	g.shortestPath(5);
+	g.shortestPath();
 	
 	g.printToConsole();
 	g.printToFile(out);
