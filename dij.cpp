@@ -1,41 +1,4 @@
-// Program to find Dijkstra's shortest path using
-// priority_queue in STL
-#include<bits/stdc++.h>
-#include<tuple>
-#include<fstream>
-#include<sys/stat.h>
-
-using namespace std;
-# define INF 0x3f3f3f3f
-
-// iPair ==> Integer Pair
-typedef pair<int, int> iPair;
-
-// This class represents a directed graph using
-// adjacency list representation
-class Graph
-{
-	int V; // No. of vertices
-	int node; //the source node
-
-	// In a weighted graph, we need to store vertex
-	// and weight pair for every edge
-	list< pair<int, int> > *adj;
-
-public:
-	Graph(int V, int node); // Constructor
-	vector<tuple<int, int, int>> routingTable; // Tuple format: Node, Next Hop Cost 
-	// function to add an edge to graph
-	void addEdge(int u, int v, int w);
-
-	// prints shortest path from s
-	void shortestPath();
-	
-	//Print to Console and file
-	void printToConsole();
-	void printToFile(std::ofstream &out);
-	
-};
+#include "dij.h"
 
 // Allocates memory for adjacency list
 Graph::Graph(int V, int node)
@@ -114,7 +77,7 @@ void Graph::shortestPath()
 	for (int i = 0; i < V; ++i){
 		node = i;
 		if (pathsToVec[i].size() < 1)
-            		nextHop = NULL;
+            		nextHop = -1;
         	else if (pathsToVec[i].size() < 2)
         		nextHop = pathsToVec[i][0];
         	else
@@ -135,7 +98,7 @@ void Graph::printToConsole(){
 	}
 }
 
-bool fileExists(const std::string& filename)
+bool fileExistss(const std::string& filename)
 {
     struct stat buf;
     if (stat(filename.c_str(), &buf) != -1)
@@ -145,8 +108,8 @@ bool fileExists(const std::string& filename)
     return false;
 }
 
-void clearFile(){
-	if(fileExists("dij.out")){
+void clearFilee(){
+	if(fileExistss("dij.out")){
 		remove("dij.out");
 	}
 }
@@ -162,9 +125,9 @@ void Graph::printToFile(std::ofstream &out){
 }
 
 // Driver program to test methods of graph class
-int main()
+int main2()
 {
-	clearFile();
+	clearFilee();
 	ofstream out;
 	out.open("dij.out");
 
@@ -195,3 +158,4 @@ int main()
 	g.printToFile(out);
 	return 0;
 }
+
