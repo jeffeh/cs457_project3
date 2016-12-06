@@ -1,7 +1,7 @@
 CPP_SRCS = *.cpp
 CPP_OBJS = *.o
 
-SS_SRCS = Router.cpp
+SS_SRCS = Router.cpp dij.cpp
 AW_SRCS = Manager.cpp
 
 SS_OBJS = Router.o
