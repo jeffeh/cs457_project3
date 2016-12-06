@@ -205,6 +205,7 @@ void startUDPListening(int socketFileDesc, vector<tuple<int,int,int>> links){
 void sendLSPToNeighbors(int socketFileDesc,string lsp, vector<tuple<int,int,int>> links, vector<Neighbor> net){
 	int i=0;
 	for(tuple<int,int,int> link:links){
+		cout << "sending lsp to neighbr" << lsp[0] << endl;
 		char* l = const_cast<char*>(lsp.c_str());
 		char buf[512];
 		strcpy(buf, l);
@@ -344,7 +345,7 @@ int main(int argc, char*argv[]){
 	t1.join();
 	sendMessage(sockman, "all acks recieved");
 	string l = receiveMessage(sockman);
-	cout <<"Router "<<myID << ": " << l << endl;
+	//cout <<"Router "<<myID << ": " << l << endl;
 	thread t2(startUDPrecLSP,myID, sockudp, links, nett);
 	sendLSPToNeighbors(sockudp, getLSP(myID, links), links, nett);
 	t2.join();
