@@ -26,7 +26,7 @@
 #include <thread>
 #include <cstring>
 #include <arpa/inet.h>
-#include <ConnectivityTable.h>
+#include <project3.h>
 #include "dij.h"
 #include <unistd.h>
 using namespace std;
@@ -68,17 +68,54 @@ bool fileExists(const std::string& filename)
     }
     return false;
 }
+int myID = -1;
 void printMessage(string message){
-	string out =  currentDateTime() + " [Router]: " + message + "\n";
+
+	static int i = 0;
+	static vector<string> timebuff;
+	static vector<string> messbuff;
+	string time = currentDateTime();
+	string out =  time + " [Router "+to_string(myID)+"]: " + message + "\n";
+	if(myID == -1){
+		timebuff.push_back(time);
+		messbuff.push_back(message);
+		return;
+	}
+	else{
+		if(i==0){
+			ofstream myfile;
+			string fileName = "router"+to_string(myID)+".out";
+
+			myfile.open(const_cast<char*>(fileName.c_str()), ios::app);
+			for(unsigned int j=0; j<timebuff.size(); j++){
+				string bout = timebuff[j] + " [Router "+to_string(myID)+"]: "+messbuff[j]+"\n";
+				myfile << bout;
+			}
+			myfile.close();
+			i++;
+		}
+		else{
+
+		}
+
+	}
+
 	cout << out;
 	ofstream myfile;
-	myfile.open("router.out", ios::app);
+	string fileName = "router"+to_string(myID)+".out";
+
+	myfile.open(const_cast<char*>(fileName.c_str()), ios::app);
 	myfile << out;
 	myfile.close();
 }
 void clearFile(){
-	if(fileExists("router.out")){
-		remove("router.out");
+	if(myID == -1)
+		return;
+
+	const string fileName = "router"+to_string(myID)+".out";
+
+	if(fileExists(fileName)){
+		remove(fileName.c_str());
 	}
 }
 void error(const string msg)
@@ -106,11 +143,11 @@ int connectToManager(char* hostname, int port){
 	serverAddress.sin_family = AF_INET;
 	bcopy((char*)server->h_addr, (char*)&serverAddress.sin_addr.s_addr, server->h_length);
 	serverAddress.sin_port = htons(port);
-	printMessage("Connecting to server... ");
+	printMessage("Connecting to Manager... ");
 	if(connect(socketFileDesc, (sockaddr *)&serverAddress, sizeof(serverAddress)) < 0){
 		perror("couldn't connect");
 	}
-	printMessage("Connected!");
+	printMessage("Connected to Manager");
 	//sockett = socketFileDesc;
 	return socketFileDesc;
 }
@@ -132,7 +169,7 @@ int FT::getCostTo(int i){
 }
 tuple<int,int> createUDP(){
 	int port;
-	struct sockaddr_in serverAddress, client;
+	struct sockaddr_in serverAddress;
 		int socketFileDesc = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
 		if(socketFileDesc < 0){
@@ -142,7 +179,7 @@ tuple<int,int> createUDP(){
 		serverAddress.sin_family = AF_INET;
 		serverAddress.sin_port = 0;
 		serverAddress.sin_addr.s_addr = INADDR_ANY;
-		socklen_t  l = sizeof(client);
+		//socklen_t  l = sizeof(client);
 		if(bind(socketFileDesc, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0){
 			error("could not bind");
 		}
@@ -154,10 +191,13 @@ tuple<int,int> createUDP(){
 		tuple<int,int> ret;
 		get<0>(ret) = socketFileDesc;
 		get<1>(ret) = port;
+		string mes = "Created UPD Port on ";
+		mes += to_string(port);
+		printMessage(mes);
 		return ret;
 
 }
-void sendMessage(int sock, char mes[1200]){
+void sendMessage(int sock, const char mes[1200]){
 
 	if(send(sock, mes, 1200, 0)<0){
 		error("couldn't write to socket");
@@ -174,17 +214,19 @@ string receiveMessage(int sock){
 	return buffer;
 }
 
-void ackin(int sockFD){
+void ackin(int sockFD, int id){
 	sockaddr t;
 	size_t l = sizeof(t);
 	char buf[512];
 
 	recvfrom(sockFD, buf, sizeof(buf), 0, (sockaddr*)&t, (unsigned int*)&l);
 
-	//cout << buf << endl;
+
 	string b = buf;
 	if(b.compare("ack")==0){
-		//cout << "got Ack" << endl;
+		string ot = "Got ack from Router ";
+		ot += to_string(id);
+		printMessage(ot);
 	}
 }
 void parseInfo(string info, int& myID, vector<tuple<int,int,int>>& links);
@@ -206,13 +248,13 @@ int connectToUdp(tuple<int,int,int> t){
 	return connectToManager(const_cast<char*>(getmyip().c_str()), get<2>(t));
 }
 void startUDPListening(int socketFileDesc, vector<tuple<int,int,int>> links){
-	int counter = 0;
+	unsigned int counter = 0;
 	while(counter < links.size()){
 		//listen(socketFileDesc, 5);
 		//struct sockaddr_in clientAddress;
 		//unsigned int sizeOfAddrClient = sizeof(clientAddress);
 		//int newSocketFileDesc = accept(socketFileDesc, (struct sockaddr *) &clientAddress, &sizeOfAddrClient);
-		ts.push_back(thread(ackin, socketFileDesc));
+		ts.push_back(thread(ackin, socketFileDesc, get<0>(links[counter])));
 
 		counter++;
 	}
@@ -245,40 +287,46 @@ void startUDPListening(int socketFileDesc, vector<tuple<int,int,int>> links){
 void dij(vector<tuple<int, vector<tuple<int,int,int>>>> LSPs, int myID);
 
 
-void sendLSPToNeighbors(int socketFileDesc,string lsp, vector<tuple<int,int,int>> links, vector<Neighbor> net){
+void sendLSPToNeighbors(int socketFileDesc,string lsp, vector<tuple<int,int,int>> links, vector<Neighbor> net, int doNot){
 	int i=0;
 	for(Neighbor n:net){
-		cout << "SENDING LSP" << endl;
-		//cout << "sending lsp to neighbr" << lsp[0] << endl;
-		char* l = const_cast<char*>(lsp.c_str());
+		int N;
+		vector<tuple<int,int,int>> links2;
+		parseInfo(lsp, N, links2);
+
+
+		string tos = to_string(myID)+"\n"+lsp;
+		char* l = const_cast<char*>(tos.c_str());
 		char buf[512];
 		strcpy(buf, l);
-		//cout << endl;
-		//cout << endl;
-		//cout << "SENDING" << endl;
+		if(N != get<0>(links[i]) && get<0>(links[i])!=doNot){
+			printMessage(string("Sending/Forwarding LSP for Router "+to_string(N)+ " to Router "+to_string(get<0>(links[i]))));
+		}
 
-			//cout << buf << endl;
 		sendto(n.fileDesc, buf, sizeof(buf),0,(struct sockaddr*)&n.sin_other, sizeof(n.sin_other));
 		i++;
 	}
 }
 vector<tuple<int, vector<tuple<int,int,int>>>> LSPs;
-void startUDPrecLSP(int myID, int socketFileDesc, vector<tuple<int,int,int>> linkss, vector<Neighbor> net, int sizeOfNetwork){
+void startUDPrecLSP(int myID, int socketFileDesc, vector<tuple<int,int,int>> linkss, vector<Neighbor> net, unsigned int sizeOfNetwork){
 
-	while(LSPs.size()<sizeOfNetwork-1){
+	while(LSPs.size()<(sizeOfNetwork-1)){
 		sockaddr t;
 		size_t l = sizeof(t);
 		char buf[512];
 
 		recvfrom(socketFileDesc, buf, sizeof(buf), 0, (sockaddr*)&t, (unsigned int*)&l);
-		string inf = buf;
+		string io = buf;
+		string src = io.substr(0,1);
+		string inf = io.substr(2);
+
 
 		int N; vector<tuple<int,int,int>> links = {};
 		parseInfo(inf,N,links);
 		int tobreak = 0;
 		if(N==myID)
 			tobreak = 1;
-		for(int i=0; i<LSPs.size(); i++){
+		for(unsigned int i=0; i<LSPs.size(); i++){
 			if(get<0>(LSPs[i])==N){
 				tobreak = 1; break;
 			}
@@ -290,17 +338,21 @@ void startUDPrecLSP(int myID, int socketFileDesc, vector<tuple<int,int,int>> lin
 			continue;
 		}
 		else{
-			//cout << "Router "<< myID <<" got lsp from " << N << endl;
+
 			tuple<int, vector<tuple<int,int,int>>> ls;
 			get<0>(ls) = N;
 			get<1>(ls) = links;
+			//if(N != atoi(src.c_str())){
+				printMessage(string("Received LSP for Router "+to_string(N)+" from Router "+src	));
+			//}
+
 			LSPs.push_back(ls);
-			sendLSPToNeighbors(socketFileDesc, getLSP(N, links), linkss, net);
+			sendLSPToNeighbors(socketFileDesc, getLSP(N, links), linkss, net, atoi(src.c_str()));
 		}
 
 	}
 	string out = "Router " + to_string(myID) + " has received LSPs for: [";
-	for(int i=0; i<LSPs.size(); i++){
+	for(unsigned int i=0; i<LSPs.size(); i++){
 		out += to_string(get<0>(LSPs[i]));
 		if(i<LSPs.size()-1){
 			out += ", ";
@@ -308,40 +360,56 @@ void startUDPrecLSP(int myID, int socketFileDesc, vector<tuple<int,int,int>> lin
 
 	}
 	out += "]";
-	//cout << out << endl;
+
+
 
 }
+void fwdRouterMessage(vector<tuple<int,int,int>> links, vector<Neighbor> nett, int dest, int orig);
 void sendRouterMessage(vector<tuple<int,int,int>> links, vector<Neighbor> nett, int dest);
 void awaitRouterMessages(vector<tuple<int,int,int>> links, vector<Neighbor> nett, int sockudp, int myID){
 
 	while(true){
+
 	sockaddr t;
 	size_t l = sizeof(t);
 	char buf[512];
 
 	recvfrom(sockudp, buf, sizeof(buf), 0, (sockaddr*)&t, (unsigned int*)&l);
+
 	string inf = buf;
-	if(myID == atoi(inf.c_str())){
-		cout << myID << " got the packet" << endl;
-		return;
+	if(inf.length()>3){
+		continue;
 	}
+	string orig = inf.substr(1,1);
+	string sender = inf.substr(0,1);
+	string destt = inf.substr(2,1);
 
-	cout << myID <<" received a packet to forward to " << inf << "s"<< endl;
-	int dest = atoi(inf.c_str());
+
+	if(myID == atoi(destt.c_str())){
+		string out = "Received a packet from Router ";
+		out += sender;
+		out += ", originally from Router ";
+		out += orig;
+		out += ". This is the packets destination.";
+		printMessage(out);
+		continue;
+	}
+	printMessage("Received a packet from Router "+sender+", forwarding to Router "+destt);
+	int dest = atoi(destt.c_str());
 
 
-	//sendRouterMessage(links, nett, dest);
+	fwdRouterMessage(links, nett, dest, atoi(orig.c_str()));
 	}
 }
 void awaitInstructions(int myID, int sockudp, int sockman, vector<tuple<int,int,int>> links, vector<Neighbor> nett){
 	int sent = 1;
 	while(sent){
-		cout << "receveing" << endl;
+
 		string inst = receiveMessage(sockman);
 		if(inst.compare("Quit")==0){
-			//cout << myID << " Got QUIT" << endl;
+
 			sent = 0;
-			cout << myID << " exiting!" << endl;
+			printMessage("Exiting!");
 			close(sockudp);
 			close(sockman);
 			exit(0);
@@ -349,7 +417,7 @@ void awaitInstructions(int myID, int sockudp, int sockman, vector<tuple<int,int,
 		}
 		else{
 			int dest = atoi(inst.c_str());
-			cout << myID << " has been instructed to send a packet to " << dest << endl;
+			printMessage("has been instructed to send a packet to "+to_string(dest));
 			sendRouterMessage(links, nett, dest);
 			//send message over udp to dest
 		}
@@ -358,7 +426,6 @@ void awaitInstructions(int myID, int sockudp, int sockman, vector<tuple<int,int,
 }
 FT ft;
 void sendRouterMessage(vector<tuple<int,int,int>> links, vector<Neighbor> nett, int dest){
-	cout << "SEND ROUTER MESSAGE CALLED" << endl;
 	int i = 0;
 	int p = ft.getRouteTo(dest);
 	for(tuple<int,int,int> t:links){
@@ -367,27 +434,51 @@ void sendRouterMessage(vector<tuple<int,int,int>> links, vector<Neighbor> nett, 
 		}
 		i++;
 	}
-	string k = to_string(dest);
+	string k = to_string(myID) + to_string(myID) + to_string(dest);
 	char* l = const_cast<char*>(k.c_str());
 
 
 	char buf[512];
 	strcpy(buf, l);
 
-	sendto(nett[i].fileDesc, buf, sizeof(buf),0,(struct sockaddr*)&nett[i].sin_other, sizeof(nett[i].sin_other));
+	int n = sendto(nett[i].fileDesc, buf, sizeof(buf),0,(struct sockaddr*)&nett[i].sin_other, sizeof(nett[i].sin_other));
+	if(n<0)
+		error("got stuck");
+}
+void fwdRouterMessage(vector<tuple<int,int,int>> links, vector<Neighbor> nett, int dest, int orig){
+
+	int i = 0;
+	int p = ft.getRouteTo(dest);
+	for(tuple<int,int,int> t:links){
+		if(p==get<0>(t)){
+			break;
+		}
+		i++;
+	}
+
+	string k = to_string(myID) + to_string(orig) + to_string(dest);
+	char* l = const_cast<char*>(k.c_str());
+
+
+	char buf[512];
+	strcpy(buf, l);
+
+	int n = sendto(nett[i].fileDesc, buf, sizeof(buf),0,(struct sockaddr*)&nett[i].sin_other, sizeof(nett[i].sin_other));
+	if(n<0)
+		error("got stuck");
+
 
 }
 
 
 string getLSP(int N, vector<tuple<int,int,int>> links){
-	cout << "GETLSPCALLED:" << endl;
 	string ret;
 	ret += to_string(N);
 	ret += "\n";
 	for(tuple<int,int,int>link:links){
 		ret += to_string(get<0>(link)) +" "+to_string(get<1>(link))+" "+to_string(get<2>(link))+"\n";
 	}
-	//cout <<"GETLSP \n" << ret << endl;
+
 	return ret;
 }
 
@@ -399,10 +490,11 @@ void dij(vector<tuple<int, vector<tuple<int,int,int>>>> LSPs, int myID){
 		}
 	}
 	g.shortestPath();
-	string filename = to_string(myID)+".out";
+	string filename = "router";
+	filename += to_string(myID)+".out";
 	char* file = const_cast<char*>(filename.c_str());
-	ofstream out;out.open(file);
-	g.printToFile(out);
+	ofstream out;out.open(file, std::ios_base::app);
+	printMessage(g.printToFile(out));
 	ft.table = g.routingTable;
 }
 
@@ -434,19 +526,11 @@ void parseInfo(string info, int& myID, vector<tuple<int,int,int>>& links){
 	}
 }
 
-void printLSPs(vector<tuple<int, vector<tuple<int,int,int>>>> LSPs){
-	for(int i=0; i<LSPs.size(); i++){
-		for(tuple<int,int,int> edge:get<1>(LSPs[i])){
-			cout << get<0>(LSPs[i]) << " "<<get<0>(edge) << " "<<get<1>(edge)<<endl;;
-		}
-	}
-}
 
 int main(int argc, char*argv[]){
-	cout << "Router process created!" << endl;
+	printMessage("Router Process Created!");
 
 //Create a UDP port
-	int myID = -1;
 	vector<tuple<int,int,int>> links;
 	tuple<int,int> udp = createUDP();
 
@@ -456,26 +540,30 @@ int main(int argc, char*argv[]){
 	int sockman = connectToManager(const_cast<char*>(getmyip().c_str()), 20000);
 
 	string p = to_string(port);
-	p += "\nrequest";
 	char* mes = const_cast<char*>(p.c_str());
 	sendMessage(sockman, mes);
 	string info = receiveMessage(sockman);
-	printMessage(info);
-
+	//printMessage(info);
+	string mess = "Router received it's ID from the Manager. ID is ";
+	mess += info[0];
+	printMessage(mess);
 	parseInfo(info, myID, links);
 
 	string ready = receiveMessage(sockman);
-	cout << ready << endl;
+	string mess2;
+	mess2 = "Received confirmation from manager that it's safe to reach out to neighbors.";
+	string io = "Reaching out ack to Neighbors";
+	printMessage(mess2);
+	printMessage(io);
 
 	thread t1(startUDPListening, sockudp, links);
 	vector<Neighbor> nett;
 
-	int i=0;
 	for(tuple<int,int,int> link:links){
 //		int sockD = connectToUdp(link);
 		struct sockaddr_in si_other;
-		int s,i,slen=sizeof(si_other);
-		char buf[512];
+		int s,i;
+
 
 		 if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1)
 		     error("socket");
@@ -490,6 +578,9 @@ int main(int argc, char*argv[]){
 		 }
 
 		 i++;
+		 string ot = "Sending ACK to Router ";
+		 ot += to_string(get<0>(link));
+		 printMessage(ot);
 		 sendto(s,"ack",strlen("ack"),0,(struct sockaddr*)&si_other, sizeof(si_other));
 		//ackout(s);
 		 Neighbor nn;
@@ -502,20 +593,24 @@ int main(int argc, char*argv[]){
 
 
 	t1.join();
-	sendMessage(sockman, "all acks recieved");
+	const char* tos = "All acks recieved";
+	sendMessage(sockman, tos);
 	string l = receiveMessage(sockman);
+	printMessage("Received confirmation from the Manager that network is set up. Sending LSPs");
 	int sizeOfNetwork = atoi(receiveMessage(sockman).c_str());
-	//cout <<"Router "<<myID << ": " << l << endl;
+
 	vector<tuple<int, vector<tuple<int,int,int>>>> d;
 	thread t2(startUDPrecLSP,myID, sockudp, links, nett, sizeOfNetwork);
-	sendLSPToNeighbors(sockudp, getLSP(myID, links), links, nett);
+	sendLSPToNeighbors(sockudp, getLSP(myID, links), links, nett, -1);
 
 	t2.join();
-	//cout << "Table for: " << myID << endl;
+	printMessage("Received all LSPs. Generating table...");
 	dij(LSPs, myID);
+	printMessage("Awaiting Instructions from Manager/Other Routers");
 	thread t3(awaitRouterMessages, links, nett, sockudp, myID);
-	awaitInstructions(myID, sockudp, sockman, links, nett);
+	thread t4(awaitInstructions,myID, sockudp, sockman, links, nett);
 	t3.join();
+	t4.join();
 //	if(myID==5)
 //		printLSPs(LSPs);
 

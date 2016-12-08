@@ -19,7 +19,7 @@
 #include <thread>
 #include <sys/wait.h>
 #include <unistd.h>
-#include "ConnectivityTable.h"
+#include "project3.h"
 #include <thread>
 #include <condition_variable>
 #include <chrono>
@@ -37,6 +37,9 @@ vector<tuple<int,int,int>> readFile(string fileName, int& N){
 	ifstream infile(fileName);
 	int ln = 0;
 	while(getline(infile, line)){
+		if(line.compare("")==0){
+			continue;
+		}
 		if(line.compare("-1")==0){
 			
 			break;
@@ -62,6 +65,9 @@ vector<tuple<int,int,int>> readFile(string fileName, int& N){
 	}
 	//read src-dest packets
 	while (getline(infile, line)) {
+		if(line.compare("")==0){
+					continue;
+		}
 		if (line.compare("-1")==0) {
 			break;
 		} else {
@@ -73,7 +79,7 @@ vector<tuple<int,int,int>> readFile(string fileName, int& N){
 			get<0>(p)=src;
 			get<1>(p)=dst;
 			pacToSend.push_back(p);
-			cout << "--------src is: " << src << " -------------dst is: " << dst << endl;
+			//cout << "--------src is: " << src << " -------------dst is: " << dst << endl;
 		}
 	}
 	return ret;
@@ -125,14 +131,14 @@ void erase_indices(
 }
 vector<tuple<int, int, int>> popRouter(vector<tuple<int,int,int>>& in){
 	vector<tuple<int,int,int>> out;
-	cout << "RR:" <<in.size()<<endl;
+	//cout << "RR:" <<in.size()<<endl;
 	if(in.size() == 0){
 		return out;
 	}
 	int c = get<0>(in[0]);
 	std::unordered_set<size_t> y;
 
-	for(int i=0; i<in.size(); i++){
+	for(unsigned int i=0; i<in.size(); i++){
 		if(get<0>(in[i])==c){
 			out.push_back(in[i]);
 			y.insert(i);
@@ -174,10 +180,12 @@ void printMessage(string message){
 	myfile.close();
 }
 void clearFile(){
-	if(fileExists("manager.out")){
-		remove("manager.out");
-	}
+//	if(fileExists("manager.out")){
+//		remove("manager.out");
+//	}
+	system("rm -f *.out");
 }
+
 int setUpServer(int port){
 
 
@@ -232,29 +240,21 @@ string convertTupToMes(vector<tuple<int, int, int>> in){
 
 	return ret;
 }
-void sendMessage(int sock, char mes[1200]){
+void sendMessage(int sock, const char mes[1200]){
 	if(send(sock, mes, 1200, 0)<0){
 		error("couldn't write to socket");
 	}
 
 }
-void printNetwork(vector<Router> net){
-	for(Router r:net){
-		cout << r.myID << endl;
-		for(tuple<int,int> t:r.connections){
-			cout << get<0>(t) << " " << get<1>(t) << endl;
-		}
-		cout << endl;
-	}
-}
 
 
 pid_t* createNetwork(vector<Router> net){
 	pid_t* pID = new pid_t[net.size()];
-	for(int i=0; i<net.size(); i++){
+	for(unsigned int i=0; i<net.size(); i++){
 		pID[i] = fork();
 		if(pID[i]==0){
-			execl("router", NULL);
+			char *args[] = {(char*)0};
+			execvp("router", args);
 			exit(0);
 		}
 	}
@@ -290,13 +290,13 @@ void startRouterConnection(int sockFD, Router r){
 		std::unique_lock<std::mutex> lk(cv_m);
 		cv.wait(lk, []{return i==1;});
 		}
-		for(int i=0;i<r.connections.size(); i++){
+		for(unsigned int i=0;i<r.connections.size(); i++){
 			s+= to_string(get<0>(r.connections[i])); s+= " "; s+= to_string(get<1>(r.connections[i])); 
 			s+= " ";
 			s+= to_string(net[get<0>(r.connections[i])].udpPort);
 			s+="\n";
 		}
-		cout << s<<endl;
+		//cout << s<<endl;
 		char* mes = const_cast<char*>(s.c_str());
 		sendMessage(sockFD, mes);
 		
@@ -305,7 +305,7 @@ void startRouterConnection(int sockFD, Router r){
 
 void startServer(int N, vector<Router> net){
 	int counter = 0;
-	int socks[N];
+	
 	int socketFileDesc = setUpServer(20000);
 	vector<thread> ts;
 	while(counter<N){
@@ -331,64 +331,72 @@ void startServer(int N, vector<Router> net){
 	
 	join_all(ts);
 	
-	for(int i=0;i<net.size();i++){
+	for(unsigned int i=0;i<net.size();i++){
 		sendMessage(net[i].sockFD, "Ready!");
 	}
 	
-	cout << "ALL NETWORKS SET UP" << endl;
-	for(int i=0; i<net.size(); i++){
+	printMessage("All routers are set up.");
+	for(unsigned int i=0; i<net.size(); i++){
 		string r = receiveMessage(net[i].sockFD);
-		cout << r << " for "<<net[i].myID<<endl;
+		string p = r;
+		p+=" for router ";
+		p+=to_string(net[i].myID);
+		printMessage(p);
 	}
-	for(int i=0; i<net.size(); i++){
+	printMessage("\nAll Routers have ack'd with each other\n");
+	printMessage("Instructing Routers to begin send LSPs");
+	for(unsigned int i=0; i<net.size(); i++){
+		string out = "Telling Router ";
+		out += to_string(i);
+		out += " to send it's LSP";
+		printMessage(out);
 		sendMessage(net[i].sockFD, "begin LSP");
 		sendMessage(net[i].sockFD, const_cast<char*>(to_string(net.size()).c_str()));
 	}
+	sleep(5);
+	printMessage("\nAll routers have all LSPs\n");
+	printMessage("Beginning to forward packets");
 	for(tuple<int,int> packet:pacToSend){
 		
 		int i = get<0>(packet);
 		
 		char* toSend = const_cast<char*>(to_string(get<1>(packet)).c_str());
-		cout << "telling " << i << " to send a packet to" << toSend << endl;
+		string out = "Telling Router ";
+		out += to_string(i);
+		out += " to send a packet to Router ";
+		out+=toSend;
+		printMessage(out);
 		sendMessage(net[i].sockFD, toSend);
-		sleep(3);
+		printMessage("Sleeping for 5 seconds...");
+		sleep(5);
 	}
-	cout << "HERE" << endl;
-	for(int i=0; i<net.size(); i++){
-		sendMessage(net[i].sockFD, "Quit");
-		cout << "telling " << i << " to quit." << endl;
+	for(unsigned int i=0; i<net.size(); i++){
+		string out = "Telling Router ";
+		out += to_string(i);
+		out += " to quit.";
+		printMessage(out);
+		const char* tos = "Quit";
+		sendMessage(net[i].sockFD, tos);
 	}
+	
 }
 
 int main(int argc, char* argv[]){
+	if(argc != 2){
+		cerr << "Usage: ";
+		cerr << argv[0] << " [input file]" << endl;
+		exit(-1);
+	}
 	clearFile();
+	
 	int N;
-	vector<tuple<int,int,int>> r = readFile("in.txt", N);
+	string rf = "Reading file ";
+	rf += argv[1];
+	printMessage(rf);
+	vector<tuple<int,int,int>> r = readFile(argv[1], N);
 	net = parseTup(N,r);
-	printNetwork(net);
-	//createNetwork(net);
-//	printMessage("hello");
-//	printMessage("world");
-//	int socketFileDesc = setUpServer(20000);
-//	int clientSock = listenAndAccept(socketFileDesc);
-//	string port = receiveMessage(clientSock);
-//	printMessage("Got Message");
-//	printMessage(port);
-//
-//	vector<tuple<int,int,int>> tos = popRouter(r);
-//	cout << "NN:" << tos.size()<< endl;
-//	if(r.size() != 0){
-//		string s = convertTupToMes(tos);
-//		printMessage(s);
-//		char* c = const_cast<char*>(s.c_str());
-//
-//		sendMessage(clientSock, c);
-//	}
-//	string rr = receiveMessage(clientSock);
-//
-//	//code that waits for other routers to be ready
-//
-//	sendMessage(clientSock, "Safe!");
+	//printNetwork(net);
+
 	thread t1 = thread(startServer, N, net);
 	pid_t* pids = createNetwork(net);
 	for(int i=0; i<N; i++){
@@ -397,8 +405,8 @@ int main(int argc, char* argv[]){
 	}
 	t1.join();
 	
-	
+	printMessage("All children have exited.");
 	free(pids);
-
+	printMessage("Exiting!");
 
 }

@@ -1,5 +1,6 @@
 #include "dij.h"
-
+#include <string>
+using namespace std;
 // Allocates memory for adjacency list
 Graph::Graph(int V, int node)
 {
@@ -73,9 +74,9 @@ void Graph::shortestPath()
 			}
 		}
 	}
-	int node, nextHop, cost;
+	int nextHop, cost;
 	for (int i = 0; i < V; ++i){
-		node = i;
+		
 		if (pathsToVec[i].size() < 1)
             		nextHop = -1;
         	else if (pathsToVec[i].size() < 2)
@@ -114,14 +115,16 @@ void clearFilee(){
 	}
 }
 
-void Graph::printToFile(std::ofstream &out){
+string Graph::printToFile(std::ofstream &out){
 	int node, nextHop, cost;
+	string ret = "Forwarding Table created: \n";
 	for (int i = 0; i <V; ++i){
 		node =  std::get<0>(routingTable[i]);
 		nextHop =  std::get<1>(routingTable[i]);
 		cost =  std::get<2>(routingTable[i]);
-		out << "For node: " << node << "\t\t Next hop is: " << nextHop << "\t\t Cost: " << cost << endl;	
+		ret += "For node: " + to_string(node) + "\t\t Next hop is: " + to_string(nextHop) + "\t\t Cost: "  + to_string(cost)+"\n";	
 	}
+	return ret;
 }
 
 // Driver program to test methods of graph class

@@ -4,7 +4,7 @@
 #include<tuple>
 #include<fstream>
 #include<sys/stat.h>
-
+#include <string>
 using namespace std;
 # define INF 0x3f3f3f3f
 
@@ -33,7 +33,7 @@ public:
 	
 	//Print to Console and file
 	void printToConsole();
-	void printToFile(std::ofstream &out);
+	std::string printToFile(std::ofstream &out);
 	
 };
 

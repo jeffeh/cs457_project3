@@ -29,4 +29,4 @@ manager: Manager.cpp
 clean:
 	rm -f *.o *~ $(SS_EXE) $(AW_EXE)
 tar:
-	tar -cvf P3.tar $(CPP_SRCS) Makefile README
+	tar -cvf P3.tar $(CPP_SRCS) Makefile README dij.h project3.h
